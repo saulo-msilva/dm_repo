@@ -1,2 +1,2 @@
-teste de texto 
-com duas linhas
+lorem ipsum
+dolor sit amet
