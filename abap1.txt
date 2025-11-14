@@ -1,0 +1,276 @@
+*&---------------------------------------------------------------------*
+*& Report ZR_GITHUB_SIMULATOR
+*&---------------------------------------------------------------------*
+
+REPORT zr_compare_github_env.
+
+*---------------------------------------------------------------------*
+* Declarações de tipos                                                *
+*---------------------------------------------------------------------*
+
+TYPES: BEGIN OF ty_pricing_data,
+         knumv TYPE konv-knumv,
+         kposn TYPE konv-kposn,
+         kbetr TYPE konv-kbetr,
+         kschl TYPE konv-kschl,
+         waers TYPE konv-waers,
+         kwert TYPE konv-kwert,
+       END OF ty_pricing_data.
+
+TYPES: BEGIN OF ty_sales_data,
+         vbeln TYPE vbak-vbeln,
+         auart TYPE vbak-auart,
+         vkorg TYPE vbak-vkorg,
+         vtweg TYPE vbak-vtweg,
+         spart TYPE vbak-spart,
+         netwr TYPE vbak-netwr,
+         waerk TYPE vbak-waerk,
+       END OF ty_sales_data.
+
+TYPES: BEGIN OF ty_status_data,
+         vbeln TYPE vbuk-vbeln,
+         gbstk TYPE vbuk-gbstk,
+         lfstk TYPE vbuk-lfstk,
+         fksak TYPE vbuk-fksak,
+         wbstk TYPE vbuk-wbstk,
+         fkstk TYPE vbuk-fkstk,
+       END OF ty_status_data.
+
+*---------------------------------------------------------------------*
+* Declarações de tabelas internas                                     *
+*---------------------------------------------------------------------*
+
+DATA: gt_pricing TYPE STANDARD TABLE OF ty_pricing_data,
+      gt_sales   TYPE STANDARD TABLE OF ty_sales_data,
+      gt_status  TYPE STANDARD TABLE OF ty_status_data.
+
+*---------------------------------------------------------------------*
+* Tela de seleção                                                     *
+*---------------------------------------------------------------------*
+
+SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE TEXT-001.
+
+  PARAMETERS: p_pricin AS CHECKBOX DEFAULT 'X',
+              p_sales  AS CHECKBOX,
+              p_status AS CHECKBOX. " Agora usado para status da VBUK
+
+SELECTION-SCREEN END OF BLOCK b1.
+
+SELECTION-SCREEN BEGIN OF BLOCK b2 WITH FRAME TITLE TEXT-002.
+
+  PARAMETERS: p_rows TYPE i DEFAULT 50.
+
+SELECTION-SCREEN END OF BLOCK b2.
+
+*---------------------------------------------------------------------*
+* Eventos                                                             *
+*---------------------------------------------------------------------*
+
+START-OF-SELECTION.
+  PERFORM extract_data.
+  PERFORM display_alv.
+
+*---------------------------------------------------------------------*
+* Rotinas                                                             *
+*---------------------------------------------------------------------*
+
+FORM extract_data.
+
+  " Extrair dados de condições de preço
+  IF p_pricin = 'X'.
+
+    SELECT knumv
+           kposn
+           kbetr
+           kschl
+           waers
+           kwert
+	   teste
+      FROM tbl_teste
+      INTO TABLE testetsetet
+     UP TO p_rows ROWS
+     WHERE kbetr > 0
+     AND 1=1.
+
+  ENDIF.
+
+  " Extrair dados de vendas
+  IF p_sales = 'X'.
+
+    SELECT vbeln
+           auart
+           vkorg
+           vtweg
+           spart
+           netwr
+           waerk
+      FROM vbak
+      INTO TABLE gt_sales
+     UP TO p_rows ROWS
+     WHERE netwr > 0.
+
+  ENDIF.
+
+  " Extrair dados de status de documentos (VBUK)
+  IF p_status = 'X'.
+
+    SELECT vbeln
+           gbstk
+           lfstk
+           fksak
+           wbstk
+           fkstk
+      FROM vbuk
+      INTO TABLE gt_status
+     UP TO p_rows ROWS.
+
+  ENDIF.
+
+ENDFORM.
+
+FORM display_alv.
+
+  " Verificar se há dados para exibir
+  IF gt_pricing IS INITIAL AND gt_sales IS INITIAL AND gt_status IS INITIAL.
+    MESSAGE 'Nenhum dado selecionado ou encontrado!' TYPE 'I'.
+    RETURN.
+  ENDIF.
+
+  IF p_pricin = 'X' AND gt_pricing IS NOT INITIAL.
+    PERFORM show_pricing_data.
+  ELSEIF p_sales = 'X' AND gt_sales IS NOT INITIAL.
+    PERFORM show_sales_data.
+  ELSEIF p_status = 'X' AND gt_status IS NOT INITIAL.
+    PERFORM show_status_data.
+  ENDIF.
+
+ENDFORM.
+
+FORM show_pricing_data.
+  DATA: lo_table   TYPE REF TO cl_salv_table,
+        lo_columns TYPE REF TO cl_salv_columns_table,
+        lo_column  TYPE REF TO cl_salv_column_table,
+        lo_func    TYPE REF TO cl_salv_functions.
+
+  TRY.
+      CALL METHOD cl_salv_table=>factory
+        IMPORTING
+          r_salv_table = lo_table
+        CHANGING
+          t_table      = gt_pricing.
+
+      lo_func = lo_table->get_functions( ).
+      lo_func->set_all( abap_true ).
+
+      lo_columns = lo_table->get_columns( ).
+
+      lo_column ?= lo_columns->get_column( 'KNUMV' ).
+      lo_column->set_short_text( 'Doc.' ).
+
+      lo_column ?= lo_columns->get_column( 'KPOSN' ).
+      lo_column->set_short_text( 'Item' ).
+
+      lo_column ?= lo_columns->get_column( 'KBETR' ).
+      lo_column->set_short_text( 'ValorCond.' ).
+
+      lo_column ?= lo_columns->get_column( 'KSCHL' ).
+      lo_column->set_short_text( 'Tipo' ).
+
+      lo_column ?= lo_columns->get_column( 'WAERS' ).
+      lo_column->set_short_text( 'Moeda' ).
+
+      lo_column ?= lo_columns->get_column( 'KWERT' ).
+      lo_column->set_short_text( 'Valor Doc.' ).
+
+      lo_table->display( ).
+  CATCH cx_salv_msg.
+  ENDTRY.
+
+ENDFORM.
+
+FORM show_sales_data.
+  DATA: lo_table   TYPE REF TO cl_salv_table,
+        lo_columns TYPE REF TO cl_salv_columns_table,
+        lo_column  TYPE REF TO cl_salv_column_table,
+        lo_func    TYPE REF TO cl_salv_functions.
+
+  TRY.
+      CALL METHOD cl_salv_table=>factory
+        IMPORTING
+          r_salv_table = lo_table
+        CHANGING
+          t_table      = gt_sales.
+
+      lo_func = lo_table->get_functions( ).
+      lo_func->set_all( abap_true ).
+
+      lo_columns = lo_table->get_columns( ).
+
+      lo_column ?= lo_columns->get_column( 'VBELN' ).
+      lo_column->set_short_text( 'Doc. Venda' ).
+
+      lo_column ?= lo_columns->get_column( 'AUART' ).
+      lo_column->set_short_text( 'Tipo' ).
+
+      lo_column ?= lo_columns->get_column( 'VKORG' ).
+      lo_column->set_short_text( 'Org.Vendas' ).
+
+      lo_column ?= lo_columns->get_column( 'VTWEG' ).
+      lo_column->set_short_text( 'Canal' ).
+
+      lo_column ?= lo_columns->get_column( 'SPART' ).
+      lo_column->set_short_text( 'Setor' ).
+
+      lo_column ?= lo_columns->get_column( 'NETWR' ).
+      lo_column->set_short_text( 'Valor Líq.' ).
+
+      lo_column ?= lo_columns->get_column( 'WAERK' ).
+      lo_column->set_short_text( 'Moeda' ).
+
+      lo_table->display( ).
+  CATCH cx_salv_msg.
+  ENDTRY.
+
+ENDFORM.
+
+FORM show_status_data.
+  DATA: lo_table   TYPE REF TO cl_salv_table,
+        lo_columns TYPE REF TO cl_salv_columns_table,
+        lo_column  TYPE REF TO cl_salv_column_table,
+        lo_func    TYPE REF TO cl_salv_functions.
+
+  TRY.
+      CALL METHOD cl_salv_table=>factory
+        IMPORTING
+          r_salv_table = lo_table
+        CHANGING
+          t_table      = gt_status.
+
+      lo_func = lo_table->get_functions( ).
+      lo_func->set_all( abap_true ).
+
+      lo_columns = lo_table->get_columns( ).
+
+      lo_column ?= lo_columns->get_column( 'VBELN' ).
+      lo_column->set_short_text( 'Doc. Venda' ).
+
+      lo_column ?= lo_columns->get_column( 'GBSTK' ).
+      lo_column->set_short_text( 'Stts.Geral' ).
+
+      lo_column ?= lo_columns->get_column( 'LFSTK' ).
+      lo_column->set_short_text( 'Stts.Entr' ).
+
+      lo_column ?= lo_columns->get_column( 'FKSAK' ).
+      lo_column->set_short_text( 'Fat.Relac.' ).
+
+      lo_column ?= lo_columns->get_column( 'WBSTK' ).
+      lo_column->set_short_text( 'StatusPGTO' ).
+
+      lo_column ?= lo_columns->get_column( 'FKSTK' ).
+      lo_column->set_short_text( 'Stts. Fat.' ).
+
+      lo_table->display( ).
+  CATCH cx_salv_msg.
+  ENDTRY.
+
+ENDFORM.
